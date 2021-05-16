@@ -16,7 +16,8 @@ class RollbarSourceMapPlugin {
     silent = false,
     ignoreErrors = false,
     rollbarEndpoint = ROLLBAR_ENDPOINT,
-    encodeFilename = false
+    encodeFilename = false,
+    retry = null
   }) {
     this.accessToken = accessToken;
     this.version = version;
@@ -26,6 +27,7 @@ class RollbarSourceMapPlugin {
     this.ignoreErrors = ignoreErrors;
     this.rollbarEndpoint = rollbarEndpoint;
     this.encodeFilename = encodeFilename;
+    this.retry = retry;
   }
 
   async afterEmit(compilation) {
@@ -105,7 +107,7 @@ class RollbarSourceMapPlugin {
     return this.publicPath(sourceFile);
   }
 
-  async uploadSourceMap(compilation, { sourceFile, sourceMap }) {
+  async uploadSourceMap(compilation, { sourceFile, sourceMap }, retry) {
     const errMessage = `failed to upload ${sourceMap} to Rollbar`;
     let sourceMapSource;
 
@@ -137,6 +139,15 @@ class RollbarSourceMapPlugin {
 
     // 4xx or 5xx response
     if (!res.ok) {
+      if (retry && retry > 0) {
+        // eslint-disable-next-line no-console
+        console.log(`Upload failed, retrying for more ${retry} time(s)`);
+        return this.uploadSourceMap(
+          compilation,
+          { sourceFile, sourceMap },
+          retry - 1
+        );
+      }
       // Attempt to parse error details from response
       let details;
       try {
@@ -164,7 +175,7 @@ class RollbarSourceMapPlugin {
       process.stdout.write('\n');
     }
     return Promise.all(
-      assets.map(asset => this.uploadSourceMap(compilation, asset))
+      assets.map(asset => this.uploadSourceMap(compilation, asset, this.retry))
     );
   }
 }

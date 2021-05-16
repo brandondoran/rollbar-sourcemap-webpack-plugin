@@ -406,13 +406,15 @@ describe('RollbarSourceMapPlugin', () => {
       expect(uploadSourceMap).toHaveBeenNthCalledWith(
         1,
         { name: 'test', errors: [] },
-        { sourceFile: 'vendor.5190.js', sourceMap: 'vendor.5190.js.map' }
+        { sourceFile: 'vendor.5190.js', sourceMap: 'vendor.5190.js.map' },
+        null
       );
 
       expect(uploadSourceMap).toHaveBeenNthCalledWith(
         2,
         { name: 'test', errors: [] },
-        { sourceFile: 'app.81c1.js', sourceMap: 'app.81c1.js.map' }
+        { sourceFile: 'app.81c1.js', sourceMap: 'app.81c1.js.map' },
+        null
       );
     });
 
@@ -548,6 +550,39 @@ describe('RollbarSourceMapPlugin', () => {
 
       await expect(plugin.uploadSourceMap(compilation, chunk)).rejects.toThrow(
         `failed to upload vendor.5190.js.map to Rollbar: request to ${ROLLBAR_ENDPOINT} failed, reason: something awful happened`
+      );
+    });
+
+    it('retries the uploadSourceMap N times if it `retry` is configured', async () => {
+      info = jest.spyOn(console, 'info').mockImplementation();
+      const log = jest.spyOn(console, 'log').mockImplementation();
+      // fails 3 times, and the last one it works
+      nock('https://api.rollbar.com:443') // eslint-disable-line no-unused-vars
+        .post('/api/1/sourcemap')
+        .reply(422);
+      nock('https://api.rollbar.com:443') // eslint-disable-line no-unused-vars
+        .post('/api/1/sourcemap')
+        .reply(422);
+      nock('https://api.rollbar.com:443') // eslint-disable-line no-unused-vars
+        .post('/api/1/sourcemap')
+        .reply(422);
+
+      nock('https://api.rollbar.com:443') // eslint-disable-line no-unused-vars
+        .post('/api/1/sourcemap')
+        .reply(200, JSON.stringify({ err: 0, result: 'master-latest-sha' }));
+
+      await plugin.uploadSourceMap(compilation, chunk, 3);
+      expect(info).toHaveBeenCalledWith(
+        'Uploaded vendor.5190.js.map to Rollbar'
+      );
+      expect(log).toHaveBeenCalledWith(
+        'Upload failed, retrying for more 3 time(s)'
+      );
+      expect(log).toHaveBeenCalledWith(
+        'Upload failed, retrying for more 2 time(s)'
+      );
+      expect(log).toHaveBeenCalledWith(
+        'Upload failed, retrying for more 1 time(s)'
       );
     });
   });
