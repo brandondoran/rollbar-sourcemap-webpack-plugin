@@ -74,26 +74,27 @@ class RollbarSourceMapPlugin {
         return result;
       }
 
-      const sourceFile = chunk.files.find(file => /\.js$/.test(file));
+      const intermediate = [];
 
-      // webpack 5 stores source maps in `chunk.auxiliaryFiles` while webpack 4
+      const sourceFiles = chunk.files.filter(file => /\.js$/.test(file)); // webpack 5 stores source maps in `chunk.auxiliaryFiles` while webpack 4
       // stores them in `chunk.files`. This allows both webpack versions to work
       // with this plugin.
-      const sourceMap = (chunk.auxiliaryFiles || chunk.files).find(file =>
+
+      const sourceMaps = (chunk.auxiliaryFiles || chunk.files).filter(file =>
         /\.js\.map$/.test(file)
       );
 
-      if (!sourceFile || !sourceMap) {
-        return result;
-      }
-
-      return [
-        ...result,
-        {
-          sourceFile: encodeFilename ? encodeURI(sourceFile) : sourceFile,
-          sourceMap
+      // A chunk can have multiple files (e.g. esm/nomodule), try to match all
+      sourceFiles.forEach((sourceFile, index) => {
+        if (sourceMaps[index] && sourceMaps[index].includes(sourceFile)) {
+          intermediate.push({
+            sourceFile: encodeFilename ? encodeURI(sourceFile) : sourceFile,
+            sourceMap: sourceMaps[index]
+          });
         }
-      ];
+      });
+
+      return [...result, ...intermediate];
     }, []);
   }
 

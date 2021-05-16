@@ -302,6 +302,26 @@ describe('RollbarSourceMapPlugin', () => {
       ]);
     });
 
+    it('handles multiple source files', () => {
+      chunks = [
+        {
+          id: 1,
+          names: ['app'],
+          files: [
+            'app.81c1.js',
+            'app.81c1.js.map',
+            'app.81c1.esm.js',
+            'app.81c1.esm.js.map'
+          ]
+        }
+      ];
+      const assets = plugin.getAssets(compilation);
+      expect(assets).toEqual([
+        { sourceFile: 'app.81c1.js', sourceMap: 'app.81c1.js.map' },
+        { sourceFile: 'app.81c1.esm.js', sourceMap: 'app.81c1.esm.js.map' }
+      ]);
+    });
+
     it('includes unnamed chunks when includeChunks is not specified', () => {
       chunks = [
         {
